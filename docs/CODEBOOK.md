@@ -1,7 +1,7 @@
-# Habit Tracker Codebook
+# Tsuzumi Codebook
 
 ## 1. Overview
-This document serves as the "Codebook" for the Habit Tracker application. It bridges the gap between the functional specifications (`mvp_specification.md`) and the actual source code, facilitating maintenance and onboarding.
+This document serves as the "Codebook" for the Tsuzumi application. It bridges the gap between the functional specifications (`mvp_specification.md`) and the actual source code, facilitating maintenance and onboarding.
 
 ### Tech Stack
 - **Frontend**: React Native + Expo (SDK 52)

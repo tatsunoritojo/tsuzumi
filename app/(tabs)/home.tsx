@@ -121,7 +121,7 @@ export default function HomeScreen() {
         const latestCheer = cardCheers[0];
         cheerMap[card.card_id] = {
           icons,
-          from: 'ハビット仲間',
+          from: '仲間',
           fromUid: latestCheer.from_uid || null
         };
       }

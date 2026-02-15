@@ -67,19 +67,18 @@ export async function onHumanCheerSentLogic(
         const cardData = cardSnap.exists ? cardSnap.data() : null;
 
         // カテゴリ名取得
-        let categoryName = 'ハビット';
+        let categoryName = '習慣';
         if (cardData && cardData.category_l3) {
-            // カテゴリ名を取得するためにcategoriesを引く
             const catSnap = await db.collection('categories').doc(cardData.category_l3).get();
             if (catSnap.exists) {
-                categoryName = catSnap.data()?.name_ja || 'ハビット';
+                categoryName = catSnap.data()?.name_ja || '習慣';
             }
         }
 
         // 文字列構築
         // type: cheer -> 💪 継続、amazing -> ⭐ すごい、support -> 🤝 一緒
         const typeLabel = getTypeLabel(type);
-        const title = `💪 ${categoryName}の仲間からエール`;
+        const title = `${categoryName}の仲間からエール`;
         const body = `${typeLabel}が届きました！`;
 
         await sendHumanPushNotification(to_uid, title, body, settings.fcm_token);

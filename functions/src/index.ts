@@ -670,7 +670,7 @@ async function sendBatchNotification(userId: string, count: number): Promise<voi
       token: fcmToken,
       notification: {
         title: `🎉 今日のエールが届いています（${count}件）`,
-        body: 'ハビット仲間からの応援をチェックしてみましょう',
+        body: '仲間からの応援をチェックしてみましょう',
       },
       data: {
         type: 'batch_cheer',
@@ -818,6 +818,20 @@ export const onUserDeleted = functions.auth.user().onDelete(async (user) => {
         cardBatch.delete(doc.ref);
       });
       await cardBatch.commit();
+    }
+
+    // 7. Delete Favorites (owned by user + targeting user)
+    const favOwned = await db.collection('favorites').where('owner_uid', '==', userId).get();
+    const favTargeted = await db.collection('favorites').where('target_uid', '==', userId).get();
+    const uniqueFavDocs = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    favOwned.docs.forEach(doc => uniqueFavDocs.set(doc.id, doc));
+    favTargeted.docs.forEach(doc => uniqueFavDocs.set(doc.id, doc));
+    if (uniqueFavDocs.size > 0) {
+      const favBatch = db.batch();
+      uniqueFavDocs.forEach(doc => {
+        favBatch.delete(doc.ref);
+      });
+      await favBatch.commit();
     }
 
     console.log(`onUserDeleted: Cleanup complete for ${userId}`);

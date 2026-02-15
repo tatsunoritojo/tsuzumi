@@ -1,4 +1,4 @@
-# Habit Tracker
+# Tsuzumi
 
 習慣トラッキングアプリ - React Native (Expo) + Firebase
 
@@ -25,7 +25,7 @@
 
 ## プロジェクト概要
 
-Habit Tracker は、ユーザーが日々の習慣を記録・管理できるモバイルアプリケーションです。
+Tsuzumi は、ユーザーが日々の習慣を記録・管理できるモバイルアプリケーションです。
 
 > [!TIP]
 > **仕様の詳細**: `docs/CODEBOOK.md` および `docs/1_Strategy_and_Design/mvp_specification.md` を参照

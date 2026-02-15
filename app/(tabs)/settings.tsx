@@ -138,10 +138,6 @@ export default function SettingsScreen() {
     return date;
   };
 
-  const handleSignOut = async () => {
-    Alert.alert('ログアウト', 'ログアウト機能は現在実装中です');
-  };
-
   const openLink = (url: string) => {
     Linking.openURL(url).catch(() => {
       Alert.alert('エラー', 'リンクを開けませんでした');
@@ -422,11 +418,11 @@ export default function SettingsScreen() {
             <Text style={styles.rowTitle}>バージョン</Text>
             <Text style={styles.rowValue}>{appVersion}</Text>
           </View>
-          <TouchableOpacity style={styles.row} onPress={() => openLink('https://example.com/terms')}>
+          <TouchableOpacity style={styles.row} onPress={() => openLink('https://tatsunoritojo.github.io/tsuzumi/terms.html')}>
             <Text style={styles.rowTitle}>利用規約</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.row} onPress={() => openLink('https://example.com/privacy')}>
+          <TouchableOpacity style={styles.row} onPress={() => openLink('https://tatsunoritojo.github.io/tsuzumi/privacy-policy.html')}>
             <Text style={styles.rowTitle}>プライバシーポリシー</Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>

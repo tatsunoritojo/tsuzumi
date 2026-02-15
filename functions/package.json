@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "version": "1.0.0",
-  "description": "Cloud Functions for Habit Tracker",
+  "description": "Cloud Functions for Tsuzumi",
   "main": "lib/index.js",
   "scripts": {
     "lint": "eslint --ext .js,.ts .",

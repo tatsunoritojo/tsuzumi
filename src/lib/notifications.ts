@@ -6,6 +6,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
+import { router } from 'expo-router';
 
 // 通知の表示設定
 Notifications.setNotificationHandler({
@@ -137,8 +138,16 @@ export function setupNotificationListeners() {
 
   // 通知をタップした時
   const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
-    // console.log('通知をタップ:', response);
-    // TODO: 画面遷移処理を追加
+    const data = response.notification.request.content.data;
+    try {
+      if (data?.type === 'human_cheer' || data?.type === 'batch_cheer' || data?.type === 'generic') {
+        router.push('/notifications');
+      } else {
+        router.push('/(tabs)/home');
+      }
+    } catch {
+      // ナビゲーション準備完了前の場合は無視
+    }
   });
 
   // クリーンアップ関数を返す
