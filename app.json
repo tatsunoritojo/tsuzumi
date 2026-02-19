@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Tsuzumi",
-    "slug": "tsuzumi",
+    "slug": "habit-tracker",
     "scheme": "tsuzumi",
     "experiments": {
       "typedRoutes": true
