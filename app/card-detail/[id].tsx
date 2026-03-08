@@ -147,7 +147,7 @@ export default function CardDetailScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* カード情報 */}
         <View style={styles.cardInfoSection}>
-          <Text style={styles.cardIcon}>📝</Text>
+          <Text style={styles.cardIcon}>{card.icon || '📝'}</Text>
           <Text style={styles.cardTitle}>{card.title}</Text>
           {card.status === 'archived' && (
             <View style={styles.archivedBadge}>

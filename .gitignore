@@ -52,4 +52,14 @@ nul
 # screenshots (development only)
 screenshots/
 
+# store listing assets (large binary files)
+store-listing/
+
+# build artifacts
+*.aab
+*.apk
+
+# misc
+Icon.png
+
 serviceAccountKey.json
