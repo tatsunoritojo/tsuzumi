@@ -191,6 +191,20 @@ function RootLayoutInner() {
 
   // エラーが発生した場合はエラー画面を表示
   if (error) {
+    const handleRetry = async () => {
+      setError(null);
+      setReady(false);
+      setUserTapped(false);
+      try {
+        await ensureAnonymousLoginAndUser();
+        await initializeNotifications();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Firebase初期化に失敗しました');
+      } finally {
+        setReady(true);
+      }
+    };
+
     return (
       <SafeAreaProvider>
         <View
@@ -205,9 +219,20 @@ function RootLayoutInner() {
           <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FF0000', marginBottom: 10 }}>
             エラーが発生しました
           </Text>
-          <Text style={{ fontSize: 14, color: '#333333', textAlign: 'center' }}>
+          <Text style={{ fontSize: 14, color: '#333333', textAlign: 'center', marginBottom: 24 }}>
             {error}
           </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#4A90E2',
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 8,
+            }}
+            onPress={handleRetry}
+          >
+            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>再試行</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaProvider>
     );
