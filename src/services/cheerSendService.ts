@@ -44,7 +44,7 @@ export async function getCheerSuggestions(userId: string): Promise<CheerSuggesti
         const q = query(
             cardsRef,
             where('owner_uid', '==', userId),
-            where('is_public_for_cheers', '==', true)
+            where('is_public', '==', true)
         );
         const querySnapshot = await getDocs(q);
 

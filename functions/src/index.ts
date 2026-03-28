@@ -18,6 +18,19 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+/**
+ * ドキュメントをバッチ分割（500件ずつ）で削除するヘルパー
+ */
+async function deleteDocs(docs: FirebaseFirestore.QueryDocumentSnapshot[]) {
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    const chunk = docs.slice(i, i + BATCH_SIZE);
+    const batch = db.batch();
+    chunk.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+}
+
 // ========================================
 // 1. onLogCreated - ログ作成時のトリガー
 // パターン①：記録直後エール（5〜45分後にスケジュール）
@@ -31,10 +44,11 @@ export const onLogCreated = functions.firestore
     try {
       console.log(`onLogCreated: card_id=${card_id}, owner_uid=${owner_uid}`);
 
-      // カード情報を取得
+      // カード情報を取得（孤立データ防止: カードが存在しなければログを自動削除）
       const cardSnap = await db.collection('cards').doc(card_id).get();
       if (!cardSnap.exists) {
-        console.log('onLogCreated: カードが存在しません');
+        console.log(`onLogCreated: カード ${card_id} が存在しないため、孤立ログ ${snapshot.id} を削除`);
+        await snapshot.ref.delete();
         return;
       }
 
@@ -42,8 +56,7 @@ export const onLogCreated = functions.firestore
       if (!cardData) return;
 
       // ===== マッチングプール即時更新 =====
-      // is_public または is_public_for_cheers が true の場合に更新
-      if (cardData.is_public || cardData.is_public_for_cheers) {
+      if (cardData.is_public) {
         await updateMatchingPoolForCard(card_id, cardData);
       }
 
@@ -707,48 +720,80 @@ export const onHumanCheerSent = functions.firestore
 
 // ========================================
 // 8. onCardDeleted - カード削除時のトリガー
-// ログ、リアクション、マッチングプールのクリーンアップ
+// ログ、リアクション、お気に入り、エール状態のクリーンアップ（バッチ分割対応）
 // ========================================
 export const onCardDeleted = functions.firestore
   .document('cards/{cardId}')
   .onDelete(async (snapshot, context) => {
     const cardId = context.params.cardId;
     const cardData = snapshot.data();
+    const ownerUid = cardData?.owner_uid;
 
     console.log(`onCardDeleted: cardId=${cardId} cleaning up...`);
 
-    const batch = db.batch();
-
-    // 1. Logs deletion
+    // 1. Logs deletion（バッチ分割）
     const logsSnapshot = await db.collection('logs').where('card_id', '==', cardId).get();
-    logsSnapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
+    await deleteDocs(logsSnapshot.docs);
 
-    // 2. Reactions deletion (received cheers)
+    // 2. Reactions deletion（バッチ分割）
     const reactionsSnapshot = await db.collection('reactions').where('to_card_id', '==', cardId).get();
-    reactionsSnapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
+    await deleteDocs(reactionsSnapshot.docs);
 
-    // Commit logs/reactions deletion
-    await batch.commit();
-    console.log(`onCardDeleted: Deleted ${logsSnapshot.size} logs and ${reactionsSnapshot.size} reactions.`);
+    // 3. Favorites deletion（target_card_id 一致）
+    const favoritesSnapshot = await db.collection('favorites').where('target_card_id', '==', cardId).get();
+    await deleteDocs(favoritesSnapshot.docs);
 
-    // 3. Matching Pool update
+    console.log(`onCardDeleted: Deleted ${logsSnapshot.size} logs, ${reactionsSnapshot.size} reactions, ${favoritesSnapshot.size} favorites.`);
+
+    // 4. cheer_state.long_absence_cheers[card_id] エントリ削除
+    if (ownerUid) {
+      try {
+        const cheerStateRef = db.collection('cheer_state').doc(ownerUid);
+        const cheerStateSnap = await cheerStateRef.get();
+        if (cheerStateSnap.exists) {
+          const data = cheerStateSnap.data();
+          if (data?.long_absence_cheers && data.long_absence_cheers[cardId]) {
+            await cheerStateRef.update({
+              [`long_absence_cheers.${cardId}`]: admin.firestore.FieldValue.delete(),
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('onCardDeleted: cheer_state cleanup error', e);
+      }
+
+      // 5. cheer_send_state.sent_pairs から該当カードを削除
+      try {
+        const sendStateRef = db.collection('cheer_send_state').doc(ownerUid);
+        const sendStateSnap = await sendStateRef.get();
+        if (sendStateSnap.exists) {
+          const data = sendStateSnap.data();
+          if (data?.sent_pairs) {
+            const filtered = data.sent_pairs.filter((p: any) => p.to_card_id !== cardId);
+            if (filtered.length !== data.sent_pairs.length) {
+              await sendStateRef.update({ sent_pairs: filtered });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('onCardDeleted: cheer_send_state cleanup error', e);
+      }
+    }
+
+    // 6. Matching Pool update（トランザクション）
     if (cardData && cardData.category_l3) {
       const poolRef = db.collection('matching_pools').doc(cardData.category_l3);
 
       try {
         await db.runTransaction(async (t) => {
           const doc = await t.get(poolRef);
-          if (!doc.exists) return; // Pool doesn't exist
+          if (!doc.exists) return;
 
           const data = doc.data();
           if (!data || !data.active_cards) return;
 
           const activeCards = data.active_cards as any[];
-          const newActiveCards = activeCards.filter(c => c.card_id !== cardId);
+          const newActiveCards = activeCards.filter((c: any) => c.card_id !== cardId);
 
           if (activeCards.length !== newActiveCards.length) {
             t.update(poolRef, { active_cards: newActiveCards });
@@ -769,70 +814,39 @@ export const onUserDeleted = functions.auth.user().onDelete(async (user) => {
   const userId = user.uid;
   console.log(`onUserDeleted: uid=${userId} cleaning up...`);
 
-  const batch = db.batch();
-  let operationCount = 0;
-  // const MAX_BATCH_SIZE = 450; 
-
-
-
   try {
-    // 1. Logs deletion
+    // 1. Logs deletion（バッチ分割）
     const logsSnapshot = await db.collection('logs').where('owner_uid', '==', userId).get();
-    logsSnapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-      operationCount++;
-    });
+    await deleteDocs(logsSnapshot.docs);
 
-    // 2. Reactions sent
+    // 2. Reactions sent（バッチ分割）
     const reactionsSent = await db.collection('reactions').where('from_uid', '==', userId).get();
-    reactionsSent.docs.forEach(doc => {
-      batch.delete(doc.ref);
-      operationCount++;
-    });
+    await deleteDocs(reactionsSent.docs);
 
-    // 3. Reactions received
+    // 3. Reactions received（バッチ分割）
     const reactionsReceived = await db.collection('reactions').where('to_uid', '==', userId).get();
-    reactionsReceived.docs.forEach(doc => {
-      batch.delete(doc.ref);
-      operationCount++;
-    });
+    await deleteDocs(reactionsReceived.docs);
 
-    // 4. CheerState
-    const cheerStateRef = db.collection('cheer_state').doc(userId);
-    batch.delete(cheerStateRef);
-    operationCount++;
-
-    // 5. User Doc
-    const userRef = db.collection('users').doc(userId);
-    batch.delete(userRef);
-    operationCount++;
-
-    // Commit batch
-    await batch.commit();
-
-    // 6. Delete Cards (Separate batch to avoid size limits if many)
+    // 4. Cards deletion（バッチ分割）— onCardDeleted トリガーで個別 cleanup も発火する
     const cardsSnapshot = await db.collection('cards').where('owner_uid', '==', userId).get();
-    if (!cardsSnapshot.empty) {
-      const cardBatch = db.batch();
-      cardsSnapshot.docs.forEach(doc => {
-        cardBatch.delete(doc.ref);
-      });
-      await cardBatch.commit();
-    }
+    await deleteDocs(cardsSnapshot.docs);
 
-    // 7. Delete Favorites (owned by user + targeting user)
+    // 5. Favorites（owned + targeted）（バッチ分割）
     const favOwned = await db.collection('favorites').where('owner_uid', '==', userId).get();
     const favTargeted = await db.collection('favorites').where('target_uid', '==', userId).get();
     const uniqueFavDocs = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
     favOwned.docs.forEach(doc => uniqueFavDocs.set(doc.id, doc));
     favTargeted.docs.forEach(doc => uniqueFavDocs.set(doc.id, doc));
-    if (uniqueFavDocs.size > 0) {
-      const favBatch = db.batch();
-      uniqueFavDocs.forEach(doc => {
-        favBatch.delete(doc.ref);
-      });
-      await favBatch.commit();
-    }
+    await deleteDocs(Array.from(uniqueFavDocs.values()));
+
+    // 6. CheerState
+    await db.collection('cheer_state').doc(userId).delete().catch(() => {});
+
+    // 7. CheerSendState（v2 追加）
+    await db.collection('cheer_send_state').doc(userId).delete().catch(() => {});
+
+    // 8. User Doc
+    await db.collection('users').doc(userId).delete().catch(() => {});
 
     console.log(`onUserDeleted: Cleanup complete for ${userId}`);
   } catch (error) {
@@ -934,5 +948,42 @@ export const sendReminders = functions.pubsub
       console.log(`sendReminders: Sent ${notifications.length} reminders`);
     } catch (error) {
       console.error('sendReminders error:', error);
+    }
+  });
+
+// ========================================
+// 11. cleanupOrphanedLogs - 孤立ログの日次クリーンアップ
+// card_id が存在しないカードを参照するログを検出・削除
+// ========================================
+export const cleanupOrphanedLogs = functions.pubsub
+  .schedule('0 4 * * *') // 毎日 4:00 JST
+  .timeZone('Asia/Tokyo')
+  .onRun(async () => {
+    console.log('cleanupOrphanedLogs: 開始');
+
+    try {
+      // 全カードIDのセットを構築
+      const cardsSnapshot = await db.collection('cards').select().get();
+      const validCardIds = new Set(cardsSnapshot.docs.map(doc => doc.id));
+
+      // 全ログをスキャンして孤立を検出
+      const logsSnapshot = await db.collection('logs').get();
+      const orphanedDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+
+      for (const logDoc of logsSnapshot.docs) {
+        const data = logDoc.data();
+        if (!data.card_id || !validCardIds.has(data.card_id)) {
+          orphanedDocs.push(logDoc);
+        }
+      }
+
+      if (orphanedDocs.length > 0) {
+        await deleteDocs(orphanedDocs);
+        console.log(`cleanupOrphanedLogs: ${orphanedDocs.length} 件の孤立ログを削除`);
+      } else {
+        console.log('cleanupOrphanedLogs: 孤立ログなし');
+      }
+    } catch (error) {
+      console.error('cleanupOrphanedLogs error:', error);
     }
   });

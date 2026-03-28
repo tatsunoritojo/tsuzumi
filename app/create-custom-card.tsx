@@ -24,7 +24,6 @@ import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db, auth } from '../src/lib/firebase';
 import { useTemplates } from '../src/hooks/useTemplates';
 import { useCategories } from '../src/hooks/useCategories';
-import { usePublicCards } from '../src/hooks/usePublicCards';
 import { useCards } from '../src/hooks/useCards';
 import { Category, CardTemplate } from '../src/types';
 import { calculateSimilarity } from '../src/utils/habitSimilarity';
@@ -43,7 +42,6 @@ export default function CreateCustomCardScreen() {
 
     // Step 2: 類似検索結果
     const { templates } = useTemplates();
-    const { publicCards } = usePublicCards();
     const [similarTemplates, setSimilarTemplates] = useState<CardTemplate[]>([]);
 
     // Step 3: カテゴリ選択
@@ -73,15 +71,13 @@ export default function CreateCustomCardScreen() {
         { label: 'その他', icons: ['🔥', '⚡', '🌈', '☀️', '🍀', '🎁', '🎉', '💎', '🦋', '🐕', '🚀', '✈️', '🏛️', '🗼', '🎰', '🎲', '♻️', '🔮', '🌍', '🌎', '🌏', '🗺️', '🧭', '🏔️', '⛰️', '🌋', '🗻', '🏕️', '🏜️', '🏝️', '🛸', '🚁', '🚂', '🚗', '🚕', '🚌', '🚎', '🏎️', '🚲', '🛵'] },
     ];
 
-    // 最終確認 - 公開設定を2つに分割
-    const [isPublicForCheers, setIsPublicForCheers] = useState(true);
-    const [isPublicForTemplate, setIsPublicForTemplate] = useState(true);
+    // 最終確認 - 公開設定
+    const [isPublic, setIsPublic] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const { cards: userCards } = useCards();
 
     // ヘルプ表示
     const [showCheerHelp, setShowCheerHelp] = useState(false);
-    const [showTemplateHelp, setShowTemplateHelp] = useState(false);
     const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
 
@@ -92,8 +88,8 @@ export default function CreateCustomCardScreen() {
             return;
         }
 
-        // 全テンプレートと公開カードを合わせて類似度検索
-        const allCandidates = [...templates, ...publicCards];
+        // テンプレートのみから類似度検索
+        const allCandidates = [...templates];
         const scored = allCandidates.map(t => ({
             template: t,
             score: calculateSimilarity(habitName, t.title_ja),
@@ -239,9 +235,7 @@ export default function CreateCustomCardScreen() {
                 icon: selectedIcon,
                 template_id: 'custom',
                 is_custom: true,
-                is_public: false, // 後方互換性
-                is_public_for_cheers: isPublicForCheers,
-                is_public_for_template: isPublicForTemplate,
+                is_public: isPublic,
                 current_streak: 0,
                 longest_streak: 0,
                 total_logs: 0,
@@ -446,22 +440,21 @@ export default function CreateCustomCardScreen() {
                 {/* 公開設定 - L2選択済みのみ表示 */}
                 {selectedL2 && (
                     <>
-                        {/* 公開設定ヘッダー */}
                         <Text style={styles.label}>公開設定</Text>
 
-                        {/* 公開設定: エールを受け取る */}
+                        {/* チアシステムに参加 */}
                         <View style={styles.settingRow}>
                             <TouchableOpacity
                                 style={styles.settingMain}
-                                onPress={() => setIsPublicForCheers(!isPublicForCheers)}
+                                onPress={() => setIsPublic(!isPublic)}
                                 activeOpacity={0.7}
                             >
-                                <View style={[styles.checkbox, isPublicForCheers && styles.checkboxChecked]}>
-                                    {isPublicForCheers && <Text style={styles.checkmark}>✓</Text>}
+                                <View style={[styles.checkbox, isPublic && styles.checkboxChecked]}>
+                                    {isPublic && <Text style={styles.checkmark}>✓</Text>}
                                 </View>
                                 <View style={styles.rowText}>
-                                    <Text style={styles.rowLabel}>エールを受け取る</Text>
-                                    <Text style={styles.rowSubtext}>他の人からエールをもらえます</Text>
+                                    <Text style={styles.rowLabel}>チアシステムに参加</Text>
+                                    <Text style={styles.rowSubtext}>他の人からエールをもらえ、この習慣を採用できるようになります</Text>
                                 </View>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.helpButton} onPress={() => setShowCheerHelp(!showCheerHelp)}>
@@ -472,33 +465,6 @@ export default function CreateCustomCardScreen() {
                             <View style={styles.helpTooltip}>
                                 <Text style={styles.helpTooltipText}>
                                     ONにすると、同じカテゴリの習慣を頑張っている人からエール（応援）を受け取れます。あなたの習慣名とニックネームが表示されます。
-                                </Text>
-                            </View>
-                        )}
-
-                        {/* 公開設定: テンプレートとして公開 */}
-                        <View style={styles.settingRow}>
-                            <TouchableOpacity
-                                style={styles.settingMain}
-                                onPress={() => setIsPublicForTemplate(!isPublicForTemplate)}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[styles.checkbox, isPublicForTemplate && styles.checkboxChecked]}>
-                                    {isPublicForTemplate && <Text style={styles.checkmark}>✓</Text>}
-                                </View>
-                                <View style={styles.rowText}>
-                                    <Text style={styles.rowLabel}>テンプレートとして公開</Text>
-                                    <Text style={styles.rowSubtext}>他の人がこの習慣を選択できます</Text>
-                                </View>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.helpButton} onPress={() => setShowTemplateHelp(!showTemplateHelp)}>
-                                <Text style={styles.helpButtonText}>?</Text>
-                            </TouchableOpacity>
-                        </View>
-                        {showTemplateHelp && (
-                            <View style={styles.helpTooltip}>
-                                <Text style={styles.helpTooltipText}>
-                                    ONにすると、他のユーザーが習慣を選ぶときにあなたの習慣がおすすめとして表示されます。より多くの仲間と繋がれます。
                                 </Text>
                             </View>
                         )}
@@ -518,7 +484,7 @@ export default function CreateCustomCardScreen() {
                                 <Text style={styles.privacyItem}>• 習慣の記録内容（日時・回数）は公開されません</Text>
                                 <Text style={styles.privacyItem}>• 設定はいつでもカード詳細画面から変更できます</Text>
                                 <Text style={styles.privacyItem}>• ニックネームは設定画面で自由に変更可能です</Text>
-                                <Text style={styles.privacyItem}>• 両方OFFにすると完全プライベートモードになります</Text>
+                                <Text style={styles.privacyItem}>• OFFにすると完全プライベートモードになります</Text>
                             </View>
                         )}
 

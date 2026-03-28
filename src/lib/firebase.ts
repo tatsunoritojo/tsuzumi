@@ -79,13 +79,6 @@ export const ensureAnonymousLoginAndUser = async () => {
         quiet_hours_end: '07:00',
         fcm_token: null,
       },
-      stats: {
-        total_cards: 0,
-        total_logs: 0,
-        current_streak_max: 0,
-        cheers_received: 0,
-        cheers_sent: 0,
-      },
     });
   } else {
     // console.log('ensureAnonymousLoginAndUser: update last_login_at');

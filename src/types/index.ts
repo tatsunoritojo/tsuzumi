@@ -12,7 +12,6 @@ export type User = {
   created_at: Timestamp;
   last_login_at: Timestamp;
   settings: UserSettings;
-  stats: UserStats;
 };
 
 export type UserSettings = {
@@ -30,14 +29,6 @@ export type UserSettings = {
 
   // FCMトークン
   fcm_token?: string | null; // デバイストークン
-};
-
-export type UserStats = {
-  total_cards: number;
-  total_logs: number;
-  current_streak_max: number;
-  cheers_received: number;
-  cheers_sent: number;
 };
 
 // ========================================
@@ -58,10 +49,8 @@ export type Card = {
   template_id: string;
   is_custom: boolean; // MVP: 常にfalse
 
-  // 公開設定
-  is_public: boolean; // 後方互換性のため残す（deprecated）
-  is_public_for_cheers: boolean; // エールを受け取る（他の人が送信可能）
-  is_public_for_template: boolean; // テンプレートとして公開（他の人が選択可能）
+  // 公開設定: チアシステムに参加（エール受信 + 採用許可）
+  is_public: boolean;
 
   // 統計（非正規化）
   current_streak: number;

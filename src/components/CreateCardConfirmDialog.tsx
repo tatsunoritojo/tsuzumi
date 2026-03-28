@@ -5,23 +5,19 @@ import { CardTemplate } from '../types';
 type CreateCardConfirmDialogProps = {
     visible: boolean;
     template: CardTemplate | null;
-    isPublicForCheers: boolean;
-    isPublicForTemplate: boolean;
+    isPublic: boolean;
     onClose: () => void;
     onConfirm: () => void;
-    onTogglePublicForCheers: (value: boolean) => void;
-    onTogglePublicForTemplate: (value: boolean) => void;
+    onTogglePublic: (value: boolean) => void;
 };
 
 export const CreateCardConfirmDialog = ({
     visible,
     template,
-    isPublicForCheers,
-    isPublicForTemplate,
+    isPublic,
     onClose,
     onConfirm,
-    onTogglePublicForCheers,
-    onTogglePublicForTemplate,
+    onTogglePublic,
 }: CreateCardConfirmDialogProps) => {
     if (!template) return null;
 
@@ -44,36 +40,19 @@ export const CreateCardConfirmDialog = ({
 
                     <View style={styles.separator} />
 
-                    {/* 公開設定: エールを受け取る */}
+                    {/* 公開設定: チアシステムに参加 */}
                     <TouchableOpacity
                         style={styles.publicToggle}
-                        onPress={() => onTogglePublicForCheers(!isPublicForCheers)}
+                        onPress={() => onTogglePublic(!isPublic)}
                         activeOpacity={0.7}
                     >
-                        <View style={[styles.checkbox, isPublicForCheers && styles.checkboxChecked]}>
-                            {isPublicForCheers && <Text style={styles.checkmark}>✓</Text>}
+                        <View style={[styles.checkbox, isPublic && styles.checkboxChecked]}>
+                            {isPublic && <Text style={styles.checkmark}>✓</Text>}
                         </View>
                         <View style={styles.publicToggleText}>
-                            <Text style={styles.publicToggleLabel}>エールを受け取る</Text>
+                            <Text style={styles.publicToggleLabel}>チアシステムに参加</Text>
                             <Text style={styles.publicToggleDescription}>
-                                他の人からエールをもらえます
-                            </Text>
-                        </View>
-                    </TouchableOpacity>
-
-                    {/* 公開設定: テンプレートとして公開 */}
-                    <TouchableOpacity
-                        style={styles.publicToggle}
-                        onPress={() => onTogglePublicForTemplate(!isPublicForTemplate)}
-                        activeOpacity={0.7}
-                    >
-                        <View style={[styles.checkbox, isPublicForTemplate && styles.checkboxChecked]}>
-                            {isPublicForTemplate && <Text style={styles.checkmark}>✓</Text>}
-                        </View>
-                        <View style={styles.publicToggleText}>
-                            <Text style={styles.publicToggleLabel}>テンプレートとして公開</Text>
-                            <Text style={styles.publicToggleDescription}>
-                                他の人がこの習慣を選択できます
+                                他の人からエールをもらえ、この習慣を採用できるようになります
                             </Text>
                         </View>
                     </TouchableOpacity>
