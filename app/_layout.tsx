@@ -5,7 +5,8 @@ import { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ensureAnonymousLoginAndUser } from '../src/lib/firebase';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { ensureAnonymousLoginAndUser, auth, isAccountBeingDeleted } from '../src/lib/firebase';
 import { initializeNotifications, setupNotificationListeners } from '../src/lib/notifications';
 
 // Error Boundary: コンポーネントクラッシュ時にアプリ全体が落ちるのを防ぐ
@@ -78,12 +79,17 @@ export default function RootLayout() {
   );
 }
 
+// 認証無効化の種別
+type AuthInvalidReason = 'migrated' | 'deleted' | null;
+
 function RootLayoutInner() {
   const [ready, setReady] = useState(false);
-  const [animationFinished, setAnimationFinished] = useState(false);
   const [userTapped, setUserTapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authInvalid, setAuthInvalid] = useState<AuthInvalidReason>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  // 初回の onAuthStateChanged(null) を初期化中として無視するためのフラグ
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     const run = async () => {
@@ -93,16 +99,38 @@ function RootLayoutInner() {
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Firebase初期化に失敗しました');
       } finally {
+        initializedRef.current = true;
         setReady(true);
       }
     };
 
     run();
 
+    // 認証状態監視リスナー (1.2)
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!initializedRef.current) return; // 初期化完了前は無視
+
+      if (user === null) {
+        // アカウント削除による無効化
+        if (isAccountBeingDeleted) {
+          setAuthInvalid('deleted');
+          return;
+        }
+
+        // その他の無効化 → 自動で signInAnonymously() を再試行
+        try {
+          await signInAnonymously(auth);
+        } catch {
+          setError('認証セッションが無効になりました。アプリを再起動してください。');
+        }
+      }
+    });
+
     // Phase 7: 通知リスナーのセットアップ
     const cleanupNotificationListeners = setupNotificationListeners();
 
     return () => {
+      unsubscribeAuth();
       cleanupNotificationListeners();
     };
   }, []);
@@ -146,7 +174,7 @@ function RootLayoutInner() {
             loop={false}
             style={{ width: 250, height: 250 }}
             resizeMode="contain"
-            onAnimationFinish={() => setAnimationFinished(true)}
+            onAnimationFinish={() => {}}
           />
 
           {canProceed && (
@@ -189,6 +217,38 @@ function RootLayoutInner() {
     );
   }
 
+  // 認証が無効化された場合の画面 (1.2, 1.3)
+  if (authInvalid) {
+    const message =
+      authInvalid === 'migrated'
+        ? 'このアカウントは別の端末に移行されました'
+        : 'アカウントが削除されました。アプリを再起動してください';
+
+    return (
+      <SafeAreaProvider>
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>
+            {authInvalid === 'migrated' ? '📱' : '👋'}
+          </Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 10 }}>
+            {authInvalid === 'migrated' ? 'アカウント移行済み' : 'アカウント削除完了'}
+          </Text>
+          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+            {message}
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   // エラーが発生した場合はエラー画面を表示
   if (error) {
     const handleRetry = async () => {
@@ -201,6 +261,7 @@ function RootLayoutInner() {
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Firebase初期化に失敗しました');
       } finally {
+        initializedRef.current = true;
         setReady(true);
       }
     };

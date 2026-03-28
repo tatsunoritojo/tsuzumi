@@ -100,3 +100,13 @@ export const ensureAnonymousLoginAndUser = async () => {
 
   // console.log('ensureAnonymousLoginAndUser: done');
 };
+
+/**
+ * アカウント削除フラグ。
+ * deleteUser() 前に true にセットすることで、
+ * onAuthStateChanged が「削除による無効化」と判定できる。
+ */
+export let isAccountBeingDeleted = false;
+export function setAccountBeingDeleted(value: boolean) {
+  isAccountBeingDeleted = value;
+}

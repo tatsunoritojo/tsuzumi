@@ -4,12 +4,14 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { calculateUserStats, UserStats } from '../services/statsService';
+import { calculateUserStats, StatsResult } from '../services/statsService';
+import { useSettings } from './useSettings';
 
 export function useStats() {
-  const [stats, setStats] = useState<UserStats>({ weekDays: 0, monthDays: 0 });
+  const [stats, setStats] = useState<StatsResult>({ weekDays: 0, monthDays: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const { settings } = useSettings();
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -31,7 +33,11 @@ export function useStats() {
       async () => {
         // ログが変更されたら統計を再計算
         try {
-          const userStats = await calculateUserStats(currentUser.uid);
+          const userStats = await calculateUserStats(
+            currentUser.uid,
+            settings.sleep_time,
+            settings.timezone,
+          );
           setStats(userStats);
           setLoading(false);
           setError(null);
@@ -50,7 +56,7 @@ export function useStats() {
 
     // クリーンアップ
     return () => unsubscribe();
-  }, []);
+  }, [settings.sleep_time, settings.timezone]);
 
   return { stats, loading, error };
 }

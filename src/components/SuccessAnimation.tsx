@@ -16,7 +16,7 @@ interface SuccessAnimationProps {
     /** Text to display as the subtitle */
     subtitle?: string;
     /** Lottie JSON source (require(path)) */
-    source?: any;
+    source?: React.ComponentProps<typeof LottieView>['source'];
     /** If provided, renders inside the floating circle above text. If null, shows nothing. Defaults to '✨' */
     iconContent?: React.ReactNode;
 }

@@ -15,17 +15,18 @@ import { deleteDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../src/lib/firebase';
 import { useCards } from '../src/hooks/useCards';
 import { DeleteCardDialog } from '../src/components/DeleteCardDialog';
+import { Card } from '../src/types';
 
 export default function ArchivedCardsScreen() {
     const router = useRouter();
     const { cards, loading } = useCards();
-    const [selectedCard, setSelectedCard] = useState<any>(null);
+    const [selectedCard, setSelectedCard] = useState<Card | null>(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     // アーカイブされたカードのみ抽出
     const archivedCards = cards.filter((c) => c.status === 'archived');
 
-    const handleRestore = async (card: any) => {
+    const handleRestore = async (card: Card) => {
         Alert.alert(
             '復元しますか？',
             `「${card.title}」をホーム画面に戻します。`,
@@ -50,7 +51,7 @@ export default function ArchivedCardsScreen() {
         );
     };
 
-    const handleDeletePress = (card: any) => {
+    const handleDeletePress = (card: Card) => {
         setSelectedCard(card);
         setShowDeleteDialog(true);
     };
@@ -67,7 +68,7 @@ export default function ArchivedCardsScreen() {
         }
     };
 
-    const renderItem = ({ item }: { item: any }) => (
+    const renderItem = ({ item }: { item: Card }) => (
         <View style={styles.card}>
             <View style={styles.cardContent}>
                 <Text style={styles.cardIcon}>📦</Text>

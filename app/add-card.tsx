@@ -198,15 +198,5 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginBottom: 16,
   },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#4A90E2',
-    borderRadius: 8,
-  },
-  retryText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
 });
 

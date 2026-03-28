@@ -1,19 +1,13 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-
-export interface UserSettings {
-    push_enabled: boolean;
-    cheer_frequency?: 'high' | 'medium' | 'low';
-    notification_mode?: 'realtime' | 'batch';
-    batch_times?: string[];
-    quiet_hours_enabled?: boolean;
-    quiet_hours_start?: string;
-    quiet_hours_end?: string;
-}
+import { UserSettings } from '../types';
 
 const DEFAULT_SETTINGS: UserSettings = {
+    cheer_frequency: 'medium',
     push_enabled: true,
+    timezone: 'Asia/Tokyo',
+    sleep_time: null,
     notification_mode: 'realtime',
     batch_times: ['12:00', '18:00', '22:00'],
     quiet_hours_enabled: true,

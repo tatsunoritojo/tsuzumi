@@ -19,6 +19,7 @@ import {
     MatchingPoolCard,
     ReactionType,
 } from '../types';
+import { getAppToday } from '../utils/dateUtils';
 
 /**
  * 送信済みチェック用のヘルパー型
@@ -95,11 +96,7 @@ export async function getCheerSuggestions(userId: string): Promise<CheerSuggesti
                     suggestions.push({
                         ...card,
                         category_l3: categoryL3,
-                        category_name_ja: poolData.category_l3 || '習慣', // poolDataにname_jaが含まれていない場合はIDなどを代用（型定義ではname_jaはないがデータには保存しているはず）
-                        // ※MatchingPool型定義には category_l3_name_ja がないので、anyキャストか修正が必要
-                        // ここではFirestoreデータ構造に合わせて取得
-                        // @ts-ignore
-                        category_name_ja: poolData['category_l3_name_ja'] || '習慣の仲間',
+                        category_name_ja: poolData.category_l3_name_ja || '習慣の仲間',
                     });
                 });
             }
@@ -122,13 +119,15 @@ export async function sendCheer(
     fromUid: string,
     toCardId: string,
     toUid: string,
-    type: ReactionType
+    type: ReactionType,
+    sleepTime?: string | null,
+    timezone?: string,
 ): Promise<string> {
     const batch = writeBatch(db);
 
     // 1. 送信制限チェック
-    const sendState = await getOrCreateCheerSendState(fromUid);
-    const dateStr = getTodayString();
+    const sendState = await getOrCreateCheerSendState(fromUid, sleepTime, timezone);
+    const dateStr = getTodayString(sleepTime, timezone);
 
     // 1日上限チェック
     if (sendState.daily_send_date === dateStr && sendState.daily_send_count >= DAILY_SEND_LIMIT) {
@@ -221,7 +220,13 @@ export async function sendCheer(
 /**
  * アンドゥ（送信取り消し）
  */
-export async function undoCheer(reactionId: string, fromUid: string, toCardId: string): Promise<void> {
+export async function undoCheer(
+    reactionId: string,
+    fromUid: string,
+    toCardId: string,
+    sleepTime?: string | null,
+    timezone?: string,
+): Promise<void> {
     const batch = writeBatch(db);
 
     // Reaction削除
@@ -244,7 +249,7 @@ export async function undoCheer(reactionId: string, fromUid: string, toCardId: s
         // もし1日上限に厳格ならカウントも戻すべき。
         // ここではカウントも戻す。
 
-        if (data.daily_send_count > 0 && data.daily_send_date === getTodayString()) {
+        if (data.daily_send_count > 0 && data.daily_send_date === getTodayString(sleepTime, timezone)) {
             batch.update(sendStateRef, {
                 daily_send_count: data.daily_send_count - 1,
                 sent_pairs: updatedPairs,
@@ -264,7 +269,11 @@ export async function undoCheer(reactionId: string, fromUid: string, toCardId: s
 /**
  * 送信状態を取得または初期化
  */
-export async function getOrCreateCheerSendState(userId: string): Promise<CheerSendState> {
+export async function getOrCreateCheerSendState(
+    userId: string,
+    sleepTime?: string | null,
+    timezone?: string,
+): Promise<CheerSendState> {
     const ref = doc(db, 'cheer_send_state', userId);
     const snap = await getDoc(ref);
 
@@ -276,7 +285,7 @@ export async function getOrCreateCheerSendState(userId: string): Promise<CheerSe
     const initialState: CheerSendState = {
         user_uid: userId,
         daily_send_count: 0,
-        daily_send_date: getTodayString(),
+        daily_send_date: getTodayString(sleepTime, timezone),
         sent_pairs: [],
         updated_at: Timestamp.now(),
     };
@@ -299,12 +308,8 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * YYYY-MM-DD 文字列取得
+ * YYYY-MM-DD 文字列取得（日付境界対応）
  */
-function getTodayString(): string {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+function getTodayString(sleepTime?: string | null, timezone?: string): string {
+    return getAppToday(sleepTime, timezone);
 }

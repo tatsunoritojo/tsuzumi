@@ -7,20 +7,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useReactions } from '../src/hooks/useReactions';
 import { useCards } from '../src/hooks/useCards';
+import { useSettings } from '../src/hooks/useSettings';
+import { getAppToday, getAppDate } from '../src/utils/dateUtils';
 
 export default function TodayCheersScreen() {
   const { reactions, loading } = useReactions();
   const { cards } = useCards();
+  const { settings } = useSettings();
 
   // 今日のエールをフィルタリング
   const todayCheers = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getAppToday(settings.sleep_time, settings.timezone);
     return reactions.filter((reaction) => {
       if (!reaction.created_at) return false;
-      const createdDate = reaction.created_at.toDate().toISOString().split('T')[0];
+      const createdDate = getAppDate(reaction.created_at.toDate(), settings.sleep_time, settings.timezone);
       return createdDate === today;
     });
-  }, [reactions]);
+  }, [reactions, settings.sleep_time, settings.timezone]);
 
   // ハイライト: リアクション種別でグループ化
   const highlights = useMemo(() => {

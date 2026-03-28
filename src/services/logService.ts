@@ -8,19 +8,24 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
   getDocs,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Log } from '../types';
+import { getAppToday } from '../utils/dateUtils';
 
 /**
  * ログを記録し、カードの統計を更新する
  */
-export async function recordLog(cardId: string, ownerUid: string): Promise<void> {
+export async function recordLog(
+  cardId: string,
+  ownerUid: string,
+  sleepTime?: string | null,
+  timezone?: string,
+): Promise<void> {
   const now = Timestamp.now();
-  const today = new Date().toISOString().split('T')[0];
+  const today = getAppToday(sleepTime, timezone);
 
   try {
     // 1. ログを作成
@@ -34,7 +39,7 @@ export async function recordLog(cardId: string, ownerUid: string): Promise<void>
     await addDoc(collection(db, 'logs'), logData);
 
     // 2. カードの統計を計算
-    const stats = await calculateCardStats(cardId, ownerUid);
+    const stats = await calculateCardStats(cardId, ownerUid, sleepTime, timezone);
 
     // 3. カードを更新
     const cardRef = doc(db, 'cards', cardId);
@@ -56,7 +61,9 @@ export async function recordLog(cardId: string, ownerUid: string): Promise<void>
  */
 async function calculateCardStats(
   cardId: string,
-  ownerUid: string
+  ownerUid: string,
+  sleepTime?: string | null,
+  timezone?: string,
 ): Promise<{
   currentStreak: number;
   longestStreak: number;
@@ -87,7 +94,7 @@ async function calculateCardStats(
     const logDates = logs.map((log) => new Date(log.date));
 
     // 現在のストリークを計算
-    const currentStreak = calculateCurrentStreak(logDates);
+    const currentStreak = calculateCurrentStreak(logDates, sleepTime, timezone);
 
     // 最長ストリークを計算
     const longestStreak = calculateLongestStreak(logDates);
@@ -106,10 +113,15 @@ async function calculateCardStats(
 /**
  * 現在のストリークを計算（今日から遡って連続している日数）
  */
-function calculateCurrentStreak(logDates: Date[]): number {
+export function calculateCurrentStreak(
+  logDates: Date[],
+  sleepTime?: string | null,
+  timezone?: string,
+): number {
   if (logDates.length === 0) return 0;
 
-  const today = new Date();
+  const todayStr = getAppToday(sleepTime, timezone);
+  const today = new Date(todayStr);
   today.setHours(0, 0, 0, 0);
 
   let streak = 0;
@@ -135,7 +147,7 @@ function calculateCurrentStreak(logDates: Date[]): number {
 /**
  * 最長ストリークを計算（全期間で最も長かった連続日数）
  */
-function calculateLongestStreak(logDates: Date[]): number {
+export function calculateLongestStreak(logDates: Date[]): number {
   if (logDates.length === 0) return 0;
 
   // 日付を古い順にソート

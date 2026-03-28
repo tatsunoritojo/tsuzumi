@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { doc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '../src/lib/firebase';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 export default function EditCardScreen() {
     const router = useRouter();
@@ -102,7 +102,7 @@ export default function EditCardScreen() {
         }
     };
 
-    const handleTimeChange = (event: any, selectedDate?: Date) => {
+    const handleTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
         if (Platform.OS === 'android') {
             setShowTimePicker(false);
         }

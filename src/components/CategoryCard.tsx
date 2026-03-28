@@ -1,12 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 type CategoryCardProps = {
     icon: string;
     name: string;
     description?: string;
     onPress: () => void;
-    style?: any;
+    style?: StyleProp<ViewStyle>;
 };
 
 export const CategoryCard = ({ icon, name, description, onPress, style }: CategoryCardProps) => {

@@ -18,23 +18,13 @@ import { useCheerSuggestions } from '../../src/hooks/useCheerSuggestions';
 import { CheerSender } from '../../src/components/CheerSender';
 import { recordLog } from '../../src/services/logService';
 import { auth, db } from '../../src/lib/firebase';
+import { Card } from '../../src/types';
 import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { getAppToday } from '../../src/utils/dateUtils';
 import { WelcomeBackModal } from '../../src/components/WelcomeBackModal';
 import { SuccessAnimation } from '../../src/components/SuccessAnimation';
 import { BADGE_DEFINITIONS } from '../../src/utils/gamification';
-
-// エール送信者表示コンポーネント (Removed local definition)
-
-const getCategoryIcon = (category: string) => {
-  switch (category) {
-    case 'health': return '💪';
-    case 'study': return '📚';
-    case 'life': return '🏠';
-    case 'creative': return '🎨';
-    case 'mindfulness': return '🧘';
-    default: return '📝';
-  }
-};
+import { useSettings } from '../../src/hooks/useSettings';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -42,8 +32,8 @@ export default function HomeScreen() {
   const { stats } = useStats();
   const { reactions } = useReactions();
   const { suggestions } = useCheerSuggestions();
+  const { settings } = useSettings();
   const [recording, setRecording] = useState(false);
-  const notificationCount = 0;
 
   // Welcome Back State
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
@@ -71,7 +61,7 @@ export default function HomeScreen() {
       if (userSnap.exists()) {
         const data = userSnap.data();
         const lastLogin = data.last_login_date; // string YYYY-MM-DD or null
-        const today = new Date().toISOString().split('T')[0];
+        const today = getAppToday(settings.sleep_time, settings.timezone);
 
         if (lastLogin && lastLogin !== today) {
           const lastDate = new Date(lastLogin);
@@ -98,7 +88,7 @@ export default function HomeScreen() {
   };
 
   // 今日の日付（YYYY-MM-DD形式）
-  const today = new Date().toISOString().split('T')[0];
+  const today = getAppToday(settings.sleep_time, settings.timezone);
 
   // カードごとの最新エールを取得
   const latestCheersByCard = useMemo(() => {
@@ -131,7 +121,7 @@ export default function HomeScreen() {
   }, [cards, reactions]);
 
   // カードタップハンドラ
-  const handleCardPress = (card: any) => {
+  const handleCardPress = (card: Card) => {
     // 今日のログがあるか確認
     const isLoggedToday = card.last_log_date === today;
 
@@ -160,7 +150,7 @@ export default function HomeScreen() {
 
               setRecording(true);
               try {
-                await recordLog(card.card_id, currentUser.uid);
+                await recordLog(card.card_id, currentUser.uid, settings.sleep_time, settings.timezone);
 
                 // Animation Logic
                 const nextStreak = card.current_streak + 1;
@@ -204,11 +194,11 @@ export default function HomeScreen() {
   };
 
   // カードコンポーネント
-  const renderCard = ({ item }: { item: any }) => {
+  const renderCard = ({ item }: { item: Card }) => {
     const isLoggedToday = item.last_log_date === today;
     const cheer = latestCheersByCard[item.card_id];
     // カード固有のアイコンがあればそれを使用、なければカテゴリアイコン
-    const displayIcon = item.icon || getCategoryIcon(item.category_l1);
+    const displayIcon = item.icon || '📝';
 
     return (
       <TouchableOpacity
@@ -296,14 +286,7 @@ export default function HomeScreen() {
           <Text style={styles.menuIcon}>≡</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/notifications')}>
-          <View style={styles.notificationContainer}>
-            <Text style={styles.notificationIcon}>🔔</Text>
-            {notificationCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{notificationCount}</Text>
-              </View>
-            )}
-          </View>
+          <Text style={styles.notificationIcon}>🔔</Text>
         </TouchableOpacity>
       </View>
 
@@ -415,28 +398,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: '#333333',
   },
-  notificationContainer: {
-    position: 'relative',
-  },
   notificationIcon: {
     fontSize: 24,
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   statsArea: {
     paddingVertical: 16,

@@ -17,6 +17,7 @@ import { useCheerSuggestions } from '../../src/hooks/useCheerSuggestions';
 import { useUserDisplayName } from '../../src/hooks/useUserDisplayName';
 import { useFavorites } from '../../src/hooks/useFavorites';
 import { sendCheer, undoCheer } from '../../src/services/cheerSendService';
+import { useSettings } from '../../src/hooks/useSettings';
 import { FavoriteButton } from '../../src/components/FavoriteButton';
 
 type ActionType = 'cheer' | 'amazing' | 'support';
@@ -30,6 +31,7 @@ const CardCreator: React.FC<{ uid: string }> = ({ uid }) => {
 export default function CheersScreen() {
   const { suggestions, loading, error, refresh, removeSuggestion } = useCheerSuggestions();
   const { isFavorite, addFavorite, removeFavorite, favoriteCount } = useFavorites();
+  const { settings } = useSettings();
   const [undoState, setUndoState] = useState<{
     visible: boolean;
     reactionId: string;
@@ -114,7 +116,7 @@ export default function CheersScreen() {
     if (!user) return;
 
     try {
-      const reactionId = await sendCheer(user.uid, cardId, toUid, type);
+      const reactionId = await sendCheer(user.uid, cardId, toUid, type, settings.sleep_time, settings.timezone);
 
       // UI更新（カードをリストから消す）
       removeSuggestion(cardId);
@@ -154,7 +156,7 @@ export default function CheersScreen() {
     if (!user) return;
 
     try {
-      await undoCheer(undoState.reactionId, user.uid, undoState.cardId);
+      await undoCheer(undoState.reactionId, user.uid, undoState.cardId, settings.sleep_time, settings.timezone);
       hideUndo();
       Alert.alert('取り消し', 'エールを取り消しました');
       refresh(); // リストを再取得してカードを復活させる

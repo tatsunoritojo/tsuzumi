@@ -11,8 +11,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Log } from '../types';
+import { getWeekStartDate, getMonthStartDate } from '../utils/dateUtils';
 
-export interface UserStats {
+export interface StatsResult {
   weekDays: number;  // 今週の達成日数
   monthDays: number; // 今月の達成日数
 }
@@ -20,17 +21,18 @@ export interface UserStats {
 /**
  * ユーザーの統計を計算
  * @param ownerUid ユーザーUID
+ * @param sleepTime 就寝時間（日付境界計算用）
+ * @param timezone タイムゾーン
  * @returns 今週・今月の達成日数
  */
-export async function calculateUserStats(ownerUid: string): Promise<UserStats> {
+export async function calculateUserStats(
+  ownerUid: string,
+  sleepTime?: string | null,
+  timezone?: string,
+): Promise<StatsResult> {
   try {
-    // 今週の開始日（月曜日）を取得
-    const weekStart = getWeekStart();
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-
-    // 今月の開始日を取得
-    const monthStart = getMonthStart();
-    const monthStartStr = monthStart.toISOString().split('T')[0];
+    const weekStartStr = getWeekStartDate(sleepTime, timezone);
+    const monthStartStr = getMonthStartDate(sleepTime, timezone);
 
     // ユーザーの全ログを取得
     const logsQuery = query(
@@ -59,30 +61,4 @@ export async function calculateUserStats(ownerUid: string): Promise<UserStats> {
     console.error('統計計算エラー:', error);
     throw error;
   }
-}
-
-/**
- * 今週の開始日（月曜日）を取得
- */
-function getWeekStart(): Date {
-  const today = new Date();
-  const day = today.getDay(); // 0 (日曜) - 6 (土曜)
-  const diff = day === 0 ? -6 : 1 - day; // 月曜日を週の始まりとする
-
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() + diff);
-  weekStart.setHours(0, 0, 0, 0);
-
-  return weekStart;
-}
-
-/**
- * 今月の開始日（1日）を取得
- */
-function getMonthStart(): Date {
-  const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  monthStart.setHours(0, 0, 0, 0);
-
-  return monthStart;
 }

@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { deleteUser, GoogleAuthProvider, reauthenticateWithCredential, signInWithCredential } from 'firebase/auth';
-import { auth } from '../../src/lib/firebase';
+import { deleteUser } from 'firebase/auth';
+import { auth, setAccountBeingDeleted } from '../../src/lib/firebase';
 
 export default function AccountDeletionScreen() {
     const router = useRouter();
@@ -35,16 +35,17 @@ export default function AccountDeletionScreen() {
             setLoading(true);
 
             // アカウント削除実行
+            setAccountBeingDeleted(true);
             await deleteUser(user);
-
-            Alert.alert('完了', 'アカウントを削除しました');
-            router.replace('/onboarding'); // または初期画面へ
-        } catch (error: any) {
+            // onAuthStateChanged が null を検知し、削除完了画面を表示する
+        } catch (error: unknown) {
+            setAccountBeingDeleted(false);
             console.error(error);
-            if (error.code === 'auth/requires-recent-login') {
+            const firebaseError = error as { code?: string; message?: string };
+            if (firebaseError.code === 'auth/requires-recent-login') {
                 Alert.alert('エラー', 'セキュリティのため、再ログインが必要です。一度ログアウトして再ログインしてから再度お試しください。');
             } else {
-                Alert.alert('エラー', 'アカウントの削除に失敗しました: ' + error.message);
+                Alert.alert('エラー', 'アカウントの削除に失敗しました: ' + (firebaseError.message || '不明なエラー'));
             }
         } finally {
             setLoading(false);

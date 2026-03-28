@@ -6,10 +6,12 @@ service cloud.firestore {
     // users: ユーザー情報
     // ========================================
     match /users/{uid} {
-      // 読み取り: 認証済み全員（display_name取得のため）
-      // TODO: 本番前に public_profiles サブコレクション化を検討
+      // 読み取り: 本人は全フィールド、他ユーザーは display_name のみ
+      // Firestore Rules ではフィールドレベル制御不可のため、
+      // 他ユーザーへの読み取りを許可し、クライアント側で
+      // display_name のみを使用する（settings, stats, fcm_token は参照しない）
       allow read: if request.auth != null;
-      
+
       // 書き込み: 本人のみ
       allow write: if request.auth != null && request.auth.uid == uid;
     }
@@ -18,20 +20,18 @@ service cloud.firestore {
     // cards: 習慣カード
     // ========================================
     match /cards/{cardId} {
-      // 読み取り: 本人 OR 公開カード（エール用/テンプレート用）
+      // 読み取り: 本人 OR 公開カード
       allow read: if request.auth != null && (
         resource.data.owner_uid == request.auth.uid ||
-        resource.data.is_public == true ||
-        resource.data.is_public_for_cheers == true ||
-        resource.data.is_public_for_template == true
+        resource.data.is_public == true
       );
-      
+
       // 作成: 本人のみ
-      allow create: if request.auth != null 
+      allow create: if request.auth != null
         && request.resource.data.owner_uid == request.auth.uid;
-      
+
       // 更新・削除: 本人のみ
-      allow update, delete: if request.auth != null 
+      allow update, delete: if request.auth != null
         && resource.data.owner_uid == request.auth.uid;
     }
 
@@ -40,15 +40,15 @@ service cloud.firestore {
     // ========================================
     match /logs/{logId} {
       // 読み取り: 本人のみ
-      allow read: if request.auth != null 
+      allow read: if request.auth != null
         && resource.data.owner_uid == request.auth.uid;
-      
+
       // 作成: 本人のみ
-      allow create: if request.auth != null 
+      allow create: if request.auth != null
         && request.resource.data.owner_uid == request.auth.uid;
-      
+
       // 更新・削除: 本人のみ
-      allow update, delete: if request.auth != null 
+      allow update, delete: if request.auth != null
         && resource.data.owner_uid == request.auth.uid;
     }
 
@@ -58,7 +58,7 @@ service cloud.firestore {
     match /categories/{doc} {
       allow read: if request.auth != null;
     }
-    
+
     match /card_templates/{doc} {
       allow read: if request.auth != null;
     }
@@ -76,22 +76,22 @@ service cloud.firestore {
     // ========================================
     match /reactions/{reactionId} {
       // 作成: 認証済み、かつ from_uid は自分自身
-      // ※ from_uid="system" は Cloud Functions (Admin SDK) のみ
-      allow create: if request.auth != null 
+      allow create: if request.auth != null
         && request.resource.data.from_uid == request.auth.uid;
-      
+
       // 読み取り: 送信者 OR 受信者
       allow read: if request.auth != null && (
         resource.data.from_uid == request.auth.uid ||
         resource.data.to_uid == request.auth.uid
       );
-      
-      // 更新: 受信者のみ（is_read更新用）
-      allow update: if request.auth != null 
-        && resource.data.to_uid == request.auth.uid;
-      
+
+      // 更新: 受信者のみ、is_read フィールドのみ変更可能
+      allow update: if request.auth != null
+        && resource.data.to_uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+
       // 削除: 送信者のみ（アンドゥ用）
-      allow delete: if request.auth != null 
+      allow delete: if request.auth != null
         && resource.data.from_uid == request.auth.uid;
     }
 
@@ -107,18 +107,39 @@ service cloud.firestore {
     // cheer_send_state: 人間エール送信制限
     // ========================================
     match /cheer_send_state/{docId} {
-      allow read, write: if request.auth != null && docId == request.auth.uid;
+      allow read: if request.auth != null && docId == request.auth.uid;
+      // 書き込み: 本人のみ、許可フィールドのみ
+      allow write: if request.auth != null
+        && docId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'user_uid', 'daily_send_count', 'daily_send_date', 'sent_pairs', 'updated_at'
+        ]);
     }
 
     // ========================================
     // favorites: お気に入り
     // ========================================
     match /favorites/{docId} {
-      allow create: if request.auth != null 
+      allow create: if request.auth != null
         && request.resource.data.owner_uid == request.auth.uid;
-      allow read, delete: if request.auth != null 
+      allow read, delete: if request.auth != null
         && resource.data.owner_uid == request.auth.uid;
       allow update: if false;
+    }
+
+    // ========================================
+    // migration_codes: データ移行コード
+    // ========================================
+    match /migration_codes/{code} {
+      // 発行: 本人のみ
+      allow create: if request.auth != null
+        && request.resource.data.source_uid == request.auth.uid;
+
+      // 参照: 認証済みユーザー（コード入力による復元に必要）
+      allow read: if request.auth != null;
+
+      // 更新・削除: Cloud Functionsのみ
+      allow update, delete: if false;
     }
   }
 }

@@ -19,6 +19,7 @@ export type UserSettings = {
   cheer_frequency: 'high' | 'medium' | 'low' | 'off';
   push_enabled: boolean;
   timezone: string; // "Asia/Tokyo"
+  sleep_time?: string | null; // "23:00" 等。日付境界 = sleep_time + 1時間
 
   // Phase 7: エール通知設定
   notification_mode: 'realtime' | 'batch'; // リアルタイム or まとめて通知
@@ -131,6 +132,7 @@ export type CardTemplate = {
 // ========================================
 export type MatchingPool = {
   category_l3: string;
+  category_l3_name_ja?: string;
   active_cards: MatchingPoolCard[];
   updated_at: Timestamp;
 };
@@ -174,7 +176,7 @@ export type Reaction = {
 export type ReactionType = 'cheer' | 'amazing' | 'support';
 
 // Phase 7: エール送信理由
-export type CheerReason = 'record' | 'streak_break' | 'long_absence' | 'random';
+export type CheerReason = 'record' | 'streak_break' | 'long_absence' | 'random' | 'manual';
 
 // リアクション表示情報
 export type ReactionInfo = {
